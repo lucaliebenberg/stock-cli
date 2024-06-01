@@ -5,16 +5,16 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strings"
 
-	"github.com/common-nighthawk/go-figure"
 	"github.com/fatih/color"
+	"github.com/joho/godotenv"
 )
 
 const (
-	apiKey             = "cpdlu61r01qh24flcgqgcpdlu61r01qh24flcgr0"
 	quoteApiUrl        = "https://finnhub.io/api/v1/quote?symbol=%s&token=%s"
 	searchApiUrl       = "https://finnhub.io/api/v1/search?q=%s&token=%s"
 	exchangeRateApiUrl = "https://api.exchangerate-api.com/v4/latest/USD"
@@ -37,7 +37,14 @@ type ExchangeRates struct {
 	Rates map[string]float64 `json:"rates"`
 }
 
-func fetchStockQuote(symbol string) (*StockQuote, error) {
+func loadEnv() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Error loading .env file")
+	}
+}
+
+func fetchStockQuote(symbol, apiKey string) (*StockQuote, error) {
 	url := fmt.Sprintf(quoteApiUrl, symbol, apiKey)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -52,7 +59,7 @@ func fetchStockQuote(symbol string) (*StockQuote, error) {
 	return &quote, nil
 }
 
-func fetchStockSymbol(companyName string) (string, error) {
+func fetchStockSymbol(companyName, apiKey string) (string, error) {
 	url := fmt.Sprintf(searchApiUrl, companyName, apiKey)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -97,63 +104,62 @@ func convertCurrency(value float64, rates *ExchangeRates, currency string) float
 	return value * rate
 }
 
-func printStockQuote(symbol string, quote *StockQuote, currency string, rates *ExchangeRates) {
+func printStockQuote(symbol string, quote *StockQuote) {
 	cyan := color.New(color.FgCyan).SprintFunc()
 	green := color.New(color.FgGreen).SprintFunc()
 	red := color.New(color.FgRed).SprintFunc()
 	yellow := color.New(color.FgYellow).SprintFunc()
-	// bold := color.New(color.FgHiWhite, color.Bold).SprintFunc()
+	bold := color.New(color.FgHiWhite, color.Bold).SprintFunc()
 
-	convertedC := convertCurrency(quote.C, rates, currency)
-	convertedH := convertCurrency(quote.H, rates, currency)
-	convertedL := convertCurrency(quote.L, rates, currency)
-	convertedO := convertCurrency(quote.O, rates, currency)
-	convertedPc := convertCurrency(quote.Pc, rates, currency)
-
-	// Create ASCII art for the company name
-	companyArt := figure.NewFigure(strings.ToUpper(symbol), "", true)
-	companyArt.Print()
+	// Print stock name in a larger font style
+	fmt.Printf("\n%s\n\n", bold(strings.ToUpper(symbol)))
 
 	// Print table header
 	fmt.Printf("%-25s %s\n", cyan("DESCRIPTION"), cyan("VALUE"))
 
 	// Print table rows
-	fmt.Printf("%-25s %s %.2f\n", "Current Price", green(currency), convertedC)
-	fmt.Printf("%-25s %s %.2f\n", "High Price of the Day", green(currency), convertedH)
-	fmt.Printf("%-25s %s %.2f\n", "Low Price of the Day", red(currency), convertedL)
-	fmt.Printf("%-25s %s %.2f\n", "Open Price of the Day", yellow(currency), convertedO)
-	fmt.Printf("%-25s %s %.2f\n", "Previous Close Price", yellow(currency), convertedPc)
+	fmt.Printf("%-25s %s\n", "Current Price", green(fmt.Sprintf("%.2f", quote.C)))
+	fmt.Printf("%-25s %s\n", "High Price of the Day", green(fmt.Sprintf("%.2f", quote.H)))
+	fmt.Printf("%-25s %s\n", "Low Price of the Day", red(fmt.Sprintf("%.2f", quote.L)))
+	fmt.Printf("%-25s %s\n", "Open Price of the Day", yellow(fmt.Sprintf("%.2f", quote.O)))
+	fmt.Printf("%-25s %s\n", "Previous Close Price", yellow(fmt.Sprintf("%.2f", quote.Pc)))
 }
 
 func main() {
+	loadEnv()
+
+	apiKey := os.Getenv("FINNHUB_API_KEY")
+	if apiKey == "" {
+		log.Fatalf("FINNHUB_API_KEY is not set in the .env file")
+	}
+
 	if len(os.Args) < 3 {
 		fmt.Println("Please provide a company name and currency.")
 		return
 	}
 	companyName := os.Args[1]
-	currency := os.Args[2]
 
 	// Fetch the stock symbol from the company name
-	symbol, err := fetchStockSymbol(companyName)
+	symbol, err := fetchStockSymbol(companyName, apiKey)
 	if err != nil {
 		fmt.Println("Error fetching stock symbol:", err)
 		return
 	}
 
 	// Fetch the stock quote using the symbol
-	quote, err := fetchStockQuote(symbol)
+	quote, err := fetchStockQuote(symbol, apiKey)
 	if err != nil {
 		fmt.Println("Error fetching stock quote:", err)
 		return
 	}
 
 	// Fetch exchange rates
-	rates, err := fetchExchangeRates()
+	_, err = fetchExchangeRates()
 	if err != nil {
 		fmt.Println("Error fetching exchange rates:", err)
 		return
 	}
 
 	// Print the stock quote
-	printStockQuote(companyName, quote, currency, rates)
+	printStockQuote(symbol, quote)
 }
