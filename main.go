@@ -1,5 +1,3 @@
-// api-key: "cpdlu61r01qh24flcgqgcpdlu61r01qh24flcgr0"
-
 package main
 
 import (
