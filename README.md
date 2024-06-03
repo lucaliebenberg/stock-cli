@@ -2,6 +2,8 @@
 
 Stock Info CLI is a command-line application written in Go that allows users to fetch and display stock market information for a given company. The application utilizes the Finnhub API to retrieve real-time stock data and displays the information in a user-friendly format, complete with ASCII art and color-coded text.
 
+Project state -> In Development
+
 ## Features
 
 - Fetch stock information using the company name.
